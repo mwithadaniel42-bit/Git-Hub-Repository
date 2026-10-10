@@ -1,0 +1,128 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera & GPS Capture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 1rem;
+            background-color: #f4f4f9;
+        }
+        video, canvas, img {
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #coords-info {
+            margin: 15px 0;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Capture Photo & GPS Coordinates</h2>
+
+    <div id="coords-info">Coordinates: Not fetched yet</div>
+
+    <div>
+        <video id="video" autoplay playsinline></video>
+    </div>
+
+    <div>
+        <button id="start-camera">Start Camera</button>
+        <button id="capture-btn">Capture Photo & GPS</button>
+    </div>
+
+    <div>
+        <canvas id="canvas" style="display: none;"></canvas>
+        <img id="photo" alt="Captured Photo will appear here" />
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const photo = document.getElementById('photo');
+        const startCameraBtn = document.getElementById('start-camera');
+        const captureBtn = document.getElementById('capture-btn');
+        const coordsInfo = document.getElementById('coords-info');
+
+        let currentLatitude = null;
+        let currentLongitude = null;
+
+        // 1. Start Camera Stream
+        startCameraBtn.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                alert('Error accessing camera: ' + err.message);
+            }
+        });
+
+        // 2. Continuously watch or fetch Geolocation
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    currentLatitude = position.coords.latitude;
+                    currentLongitude = position.coords.longitude;
+                    coordsInfo.textContent = `Lat: ${currentLatitude.toFixed(6)}, Lon: ${currentLongitude.toFixed(6)}`;
+                },
+                (error) => {
+                    coordsInfo.textContent = 'GPS Error: ' + error.message;
+                },
+                { enableHighAccuracy: true }
+            );
+        } else {
+            coordsInfo.textContent = 'Geolocation is not supported by this browser.';
+        }
+
+        // 3. Capture Photo & Record Coordinates
+        captureBtn.addEventListener('click', () => {
+            if (!video.srcObject) {
+                alert('Please start the camera first!');
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const dataUrl = canvas.toDataURL('image/png');
+            photo.src = dataUrl;
+
+            if (currentLatitude !== null && currentLongitude !== null) {
+                console.log(`Photo captured at Latitude: ${currentLatitude}, Longitude: ${currentLongitude}`);
+            } else {
+                alert('Waiting for GPS signal...');
+            }
+        });
+    </script>
+</body>
+</html>
