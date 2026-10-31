@@ -1,128 +1,244 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camera & GPS Capture</title>
+    <title>Offline Geolocation API Demo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 1rem;
-            background-color: #f4f4f9;
-        }
-        video, canvas, img {
+        /* Modern reset and centering layout */
+        html, body {
+            margin: 0;
+            padding: 0;
             width: 100%;
-            max-width: 400px;
-            height: auto;
-            border: 2px solid #ccc;
-            border-radius: 8px;
-            margin-top: 10px;
+            height: 100%;
         }
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            /* Updated with a clean modern gradient background */
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            text-align: center;
+            box-sizing: border-box;
+            padding: 20px;
+        }
+
+        h2 {
+            margin-bottom: 5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* Clean button styling */
         button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #007bff;
+            padding: 12px 24px;
+            font-size: 1rem;
+            cursor: pointer;
+            background-color: #0076ff;
             color: white;
             border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin: 5px;
+            border-radius: 6px;
+            margin: 15px 0;
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         button:hover {
             background-color: #0056b3;
         }
-        #coords-info {
-            margin: 15px 0;
-            font-weight: bold;
+        button:active {
+            transform: scale(0.98);
+        }
+        /* Readable layout for output coordinates */
+        #output {
+            max-width: 400px;
+            min-width: 280px;
+            box-sizing: border-box;
+            line-height: 1.6;
+            background: white;
             color: #333;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+
+        #emergency-types-section {
+            width: min(100%, 760px);
+            margin-top: 20px;
+            padding: 18px;
+            box-sizing: border-box;
+            border-radius: 8px;
+            background: #fff;
+            color: #333;
+            text-align: left;
+        }
+
+        #emergency-types-section h3 {
+            margin: 0 0 12px;
+        }
+
+        #emergency-types {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 10px;
+            margin: 0;
+            padding: 14px;
+            border: 1px solid #ccd3dc;
+            border-radius: 6px;
+        }
+
+        #emergency-types label {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            min-height: 36px;
+            cursor: pointer;
+        }
+
+        #emergency-types input {
+            width: 18px;
+            height: 18px;
+            accent-color: #c0392b;
+        }
+
+        .emergency-marker-label {
+            max-width: 220px;
+            white-space: normal;
+        }
+
+        #map {
+            width: min(100%, 1000px);
+            height: min(55vh, 560px);
+            min-height: 300px;
+            margin-top: 16px;
+            border-radius: 8px;
         }
     </style>
 </head>
 <body>
 
-    <h2>Capture Photo & GPS Coordinates</h2>
+    <h2>EMERGENCY OFFLINE AND ONLINE LOCATOR</h2>
+    <button onclick="getLocation()">Find My Location</button>
+    <p id="output">Click the button to get coordinates.</p>
+    <section id="emergency-types-section" aria-labelledby="emergency-types-heading">
+        <h3 id="emergency-types-heading">Emergency Types</h3>
+        <fieldset id="emergency-types">
+            <legend>Select one or more emergency types</legend>
+            <label><input type="checkbox" name="emergencyType" value="Police rescue">Police rescue</label>
+            <label><input type="checkbox" name="emergencyType" value="Fire emergency">Fire emergency</label>
+            <label><input type="checkbox" name="emergencyType" value="Flood rescue">Flood rescue</label>
+            <label><input type="checkbox" name="emergencyType" value="Road traffic accident">Road traffic accident</label>
+            <label><input type="checkbox" name="emergencyType" value="Sudden illness">Sudden illness</label>
+            <label><input type="checkbox" name="emergencyType" value="Theft">Theft</label>
+            <label><input type="checkbox" name="emergencyType" value="Assault">Assault</label>
+            <label><input type="checkbox" name="emergencyType" value="Kidnapping">Kidnapping</label>
+            <label><input type="checkbox" name="emergencyType" value="Murder">Murder</label>
+            <label><input type="checkbox" name="emergencyType" value="Child abuse">Child abuse</label>
+        </fieldset>
+    </section>
+    <div id="map" aria-label="Map showing your current location"></div>
 
-    <div id="coords-info">Coordinates: Not fetched yet</div>
-
-    <div>
-        <video id="video" autoplay playsinline></video>
-    </div>
-
-    <div>
-        <button id="start-camera">Start Camera</button>
-        <button id="capture-btn">Capture Photo & GPS</button>
-    </div>
-
-    <div>
-        <canvas id="canvas" style="display: none;"></canvas>
-        <img id="photo" alt="Captured Photo will appear here" />
-    </div>
-
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const photo = document.getElementById('photo');
-        const startCameraBtn = document.getElementById('start-camera');
-        const captureBtn = document.getElementById('capture-btn');
-        const coordsInfo = document.getElementById('coords-info');
+        const output = document.getElementById("output");
+        const map = L.map("map").setView([0, 0], 2);
+        const emergencyCheckboxes = document.querySelectorAll('input[name="emergencyType"]');
+        let locationMarker;
+        let accuracyCircle;
+        let currentCoordinates;
 
-        let currentLatitude = null;
-        let currentLongitude = null;
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: "&copy; OpenStreetMap contributors"
+        }).addTo(map);
 
-        // 1. Start Camera Stream
-        startCameraBtn.addEventListener('click', async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' },
-                    audio: false
-                });
-                video.srcObject = stream;
-            } catch (err) {
-                alert('Error accessing camera: ' + err.message);
-            }
+        emergencyCheckboxes.forEach((checkbox) => {
+            checkbox.addEventListener("change", updateLocationMarkerLabel);
         });
 
-        // 2. Continuously watch or fetch Geolocation
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(
-                (position) => {
-                    currentLatitude = position.coords.latitude;
-                    currentLongitude = position.coords.longitude;
-                    coordsInfo.textContent = `Lat: ${currentLatitude.toFixed(6)}, Lon: ${currentLongitude.toFixed(6)}`;
-                },
-                (error) => {
-                    coordsInfo.textContent = 'GPS Error: ' + error.message;
-                },
-                { enableHighAccuracy: true }
+        function updateLocationMarkerLabel() {
+            if (!locationMarker) return;
+
+            const selectedTypes = Array.from(
+                document.querySelectorAll('input[name="emergencyType"]:checked'),
+                (checkbox) => checkbox.value
             );
-        } else {
-            coordsInfo.textContent = 'Geolocation is not supported by this browser.';
+            locationMarker.unbindTooltip();
+            if (selectedTypes.length > 0) {
+                locationMarker.bindTooltip(selectedTypes.join(", "), {
+                    permanent: true,
+                    direction: "top",
+                    className: "emergency-marker-label"
+                }).openTooltip();
+            }
         }
 
-        // 3. Capture Photo & Record Coordinates
-        captureBtn.addEventListener('click', () => {
-            if (!video.srcObject) {
-                alert('Please start the camera first!');
-                return;
-            }
+        function getLocation() {
+            if (navigator.geolocation) {
+                output.innerHTML = "Locating (checking offline/GPS sensors)...";
 
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                // Configuration options essential for offline GPS performance
+                const geoOptions = {
+                    enableHighAccuracy: true, // Forces device to use hardware GPS if available
+                    timeout: 15000,           // Gives the GPS up to 15 seconds to find a satellite lock
+                    maximumAge: 0             // Prevents the browser from using old, cached locations
+                };
 
-            const dataUrl = canvas.toDataURL('image/png');
-            photo.src = dataUrl;
-
-            if (currentLatitude !== null && currentLongitude !== null) {
-                console.log(`Photo captured at Latitude: ${currentLatitude}, Longitude: ${currentLongitude}`);
+                navigator.geolocation.getCurrentPosition(showPosition, showError, geoOptions);
             } else {
-                alert('Waiting for GPS signal...');
+                output.innerHTML = "Geolocation is not supported by this browser.";
             }
-        });
+        }
+
+        function showPosition(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            const location = [lat, lon];
+
+            map.setView(location, 16);
+            if (locationMarker) {
+                locationMarker.setLatLng(location);
+                accuracyCircle.setLatLng(location).setRadius(accuracy);
+            } else {
+                locationMarker = L.marker(location).addTo(map);
+                accuracyCircle = L.circle(location, { radius: accuracy }).addTo(map);
+            }
+            locationMarker.bindPopup(`Your location (accuracy: ${Math.round(accuracy)} m)`).openPopup();
+            updateLocationMarkerLabel();
+
+            // Check internet status for display purposes
+            const networkStatus = navigator.onLine ? "Online" : "Offline";
+
+            output.innerHTML = `
+                <strong>Status:</strong> Successfully located (${networkStatus})<br>
+                <strong>Latitude:</strong> ${lat}<br>
+                <strong>Longitude:</strong> ${lon}<br>
+                <strong>Accuracy:</strong> within ${accuracy} meters
+            `;
+        }
+
+        function showError(error) {
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    output.innerHTML = "User denied the request for Geolocation.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    output.innerHTML = "Location information is unavailable. (If you are on a laptop/desktop offline, GPS hardware is likely missing).";
+                    break;
+                case error.TIMEOUT:
+                    output.innerHTML = "The request timed out. Finding an offline GPS lock can take longer indoors or without a clear view of the sky.";
+                    break;
+                case error.UNKNOWN_ERROR:
+                    output.innerHTML = "An unknown error occurred.";
+                    break;
+            }
+        }
     </script>
 </body>
 </html>
+
+
+

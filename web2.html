@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GIS Emergency Navigator</title>
+    <!-- Leaflet GIS Map Assets -->
+    <link rel="stylesheet" href="https://unpkg.com" />
+    <script src="https://unpkg.com"></script>
+    <style>
+        #map { height: 85vh; width: 100%; }
+        #control-panel { height: 15vh; background: #222; color: #fff; padding: 10px; display: flex; align-items: center; gap: 20px; }
+        button { background: #e74c3c; color: white; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="control-panel">
+        <h2>Emergency Command Center</h2>
+        <button onclick="triggerEmergency()">Simulate Dispatch Event</button>
+        <div id="status">System Status: Monitoring WebSockets...</div>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        // Client-Side Leaflet Map Initialization
+        const map = L.map('map').setView([-15.95, 35.06], 14);
+
+        // Core GIS Architecture Feature: Tile Layering
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Layer Groupings for Runtime GeoJSON Modification
+        let routeLayer = L.layerGroup().addTo(map);
+        let vehicleMarker = L.marker([-15.95, 35.05]).addTo(map).bindPopup("Ambulance AMB_01");
+
+        // Polling & Websocket Management Logic
+        const socket = new WebSocket(`ws://${window.location.host}`);
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            document.getElementById('status').innerText = `Update Received: ${data.event}`;
+
+            if (data.event === 'NEW_DISPATCH') {
+                // Clear previous paths from the canvas
+                routeLayer.clearLayers();
+
+                // Build coordinates mapping format from backend graph structure
+                const latLngs = data.route.map(node => [node.lat, node.lng]);
+
+                // Core GIS Architecture Feature: GeoJSON Route Overlay
+                const polyline = L.polyline(latLngs, { color: 'cyan', weight: 6, opacity: 0.8 }).addTo(routeLayer);
+                map.fitBounds(polyline.getBounds());
+
+                // Smoothly update moving vehicle positions on our canvas map index
+                vehicleMarker.setLatLng(latLngs[0]);
+            }
+        };
+
+        function triggerEmergency() {
+            fetch('/api/incident', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address: "Dispatch Request #102", lat: -15.96, lng: 35.07 })
+            });
+        }
+    </script>
+</body>
+</html>
+
